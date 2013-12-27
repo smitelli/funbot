@@ -1,53 +1,53 @@
 'use strict';
 
-var config  = require('config'),
-    lodash  = require('lodash'),
+var format  = require('util').format,
+    config  = require('config'),
     sqlite3 = require('sqlite3'),
     wobot   = require('wobot'),
     Rooms   = require('./lib/rooms'),
     Users   = require('./lib/users'),
-    bot     = new wobot.Bot(config.botParams);
+    bot     = new wobot.Bot(config.botParams),
+    watchdog;
+
+function armWatchdog () {
+    clearInterval(watchdog);
+
+    watchdog = setInterval(function () {
+        throw new Error('Watchdog timeout expired.');
+    }, config.watchdogTimeout);
+}
 
 bot.db    = new sqlite3.Database('./db/development.sqlite'),
 bot.rooms = new Rooms(bot),
 bot.users = new Users(bot);
 
-bot.onMessage(function () {
-    console.log(' -=- > Message', arguments);
-});
+bot.onConnect(function () {
+    this.on('data', armWatchdog);
 
-bot.onPrivateMessage(function () {
-    console.log(' -=- > PrivateMessage', arguments);
-});
+    this.rooms.refresh(function () {
+        this.rooms.autoJoin();
+    });
 
-bot.onInvite(function () {
-    console.log(' -=- > Invite', arguments);
-    this.join(arguments[0]);
+    this.users.refresh();
 });
 
 bot.onPing(function () {
-    this.getRooms(lodash.bind(function(err, rooms) {
-        if (err) {
-            return;
-        }
+    this.rooms.refresh();
+    this.users.refresh();
+});
 
-        this.rooms.refresh(rooms);
-    }, this));
+bot.onInvite(function (room, inviter) {
+    var roomJid    = format('%s@%s', room.user,    room.domain),
+        inviterJid = format('%s@%s', inviter.user, inviter.domain);
 
-    this.getRoster(lodash.bind(function(err, roster) {
-        if (err) {
-            return;
-        }
-
-        this.users.refresh(roster);
-    }, this));
+    this.rooms.refresh(function () {
+        this.rooms.join(roomJid, inviterJid);
+    });
 });
 
 config.loadPlugins.forEach(function (pluginFile) {
-    bot.loadPlugin(pluginFile, require(pluginFile));
-});
+    this.loadPlugin(pluginFile, require(pluginFile));
+}, bot);
 
+armWatchdog();
 bot.connect();
-
-bot.jabber.connection.socket.setTimeout(0);
-bot.jabber.connection.socket.setKeepAlive(true, 10000);
