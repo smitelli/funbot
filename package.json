@@ -1,0 +1,27 @@
+{
+    "name": "funbot",
+    "version": "0.0.1",
+    "homepage": "http://github.com/smitelli/funbot",
+    "description": "A fun HipChat bot, extensible via plugins.",
+    "author": "Scott Smitelli <scott@smitelli.com> (http://twitter.com/smitelli)",
+    "keywords": [
+        "bot",
+        "hipchat"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "git://github.com/smitelli/funbot"
+    },
+    "scripts": {
+        "start": "node ./client.js"
+    },
+    "dependencies": {
+        "config": "0.4.33",
+        "sqlite3": "2.1.19",
+        "wobot": "0.8.1"
+    },
+    "engines": {
+        "node": ">= 0.10.0",
+        "npm": ">= 1.3.0"
+    }
+}

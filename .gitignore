@@ -1,0 +1,5 @@
+config/development.json
+config/runtime.json
+db/development.sqlite
+node_modules/
+*.log
