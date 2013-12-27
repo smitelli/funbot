@@ -17,6 +17,7 @@
     },
     "dependencies": {
         "config": "0.4.33",
+        "lodash": "2.4.1",
         "sqlite3": "2.1.19",
         "wobot": "0.8.1"
     },

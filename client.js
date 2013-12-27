@@ -1,50 +1,53 @@
 'use strict';
 
 var config  = require('config'),
-    sqlite3 = require('sqlite3').verbose(),
+    lodash  = require('lodash'),
+    sqlite3 = require('sqlite3'),
     wobot   = require('wobot'),
     Rooms   = require('./lib/rooms'),
-    Users   = require('./lib/users');
+    Users   = require('./lib/users'),
+    bot     = new wobot.Bot(config.botParams);
 
-var db = new sqlite3.Database('./db/development.sqlite'),
-    b  = new wobot.Bot(config.botParams),
-    r  = new Rooms(db),
-    u  = new Users(db);
+bot.db    = new sqlite3.Database('./db/development.sqlite'),
+bot.rooms = new Rooms(bot),
+bot.users = new Users(bot);
 
-b.onMessage(function () {
+bot.onMessage(function () {
     console.log(' -=- > Message', arguments);
 });
 
-b.onPrivateMessage(function () {
+bot.onPrivateMessage(function () {
     console.log(' -=- > PrivateMessage', arguments);
 });
 
-b.onInvite(function () {
+bot.onInvite(function () {
     console.log(' -=- > Invite', arguments);
     this.join(arguments[0]);
 });
 
-b.onPing(function () {
-    console.log(' -=- > Ping', arguments);
-
-    this.getRooms(function(err, rooms) {
+bot.onPing(function () {
+    this.getRooms(lodash.bind(function(err, rooms) {
         if (err) {
             return;
         }
 
-        r.refresh(rooms);
-    });
+        this.rooms.refresh(rooms);
+    }, this));
 
-    this.getRoster(function(err, roster) {
+    this.getRoster(lodash.bind(function(err, roster) {
         if (err) {
             return;
         }
 
-        u.refresh(roster);
-    });
+        this.users.refresh(roster);
+    }, this));
 });
 
-b.connect();
+config.loadPlugins.forEach(function (pluginFile) {
+    bot.loadPlugin(pluginFile, require(pluginFile));
+});
 
-b.jabber.connection.socket.setTimeout(0);
-b.jabber.connection.socket.setKeepAlive(true, 10000);
+bot.connect();
+
+bot.jabber.connection.socket.setTimeout(0);
+bot.jabber.connection.socket.setKeepAlive(true, 10000);
