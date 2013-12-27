@@ -16,6 +16,7 @@
         "start": "node ./client.js"
     },
     "dependencies": {
+        "async": "0.2.9",
         "config": "0.4.33",
         "lodash": "2.4.1",
         "sqlite3": "2.1.19",
