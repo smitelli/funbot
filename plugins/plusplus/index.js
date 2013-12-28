@@ -8,7 +8,7 @@ var format   = require('util').format,
 
 PlusPlus.THROTTLE_LIMIT = 10;  //cooldown delay before awarding again (seconds)
 
-PlusPlus.parseAwardCommand = function (req, res) {
+PlusPlus.parseAwardCommand = function (req, res, next) {
     // Consider en- and em-dashes as possible '--' awards
     var message = req.messageRaw.replace(/\u2013|\u2014/g, '--');
 
@@ -21,7 +21,7 @@ PlusPlus.parseAwardCommand = function (req, res) {
 
     if (plusMatch && minusMatch) {
         // Both a '++'' and a '--'; ignore the whole thing
-        return;
+        return next();
 
     } else if (plusMatch) {
         // user++ or ++user
@@ -35,7 +35,7 @@ PlusPlus.parseAwardCommand = function (req, res) {
 
     } else {
         // No '++' and no '--'; don't continue
-        return;
+        return next();
     }
 
     PlusPlus.processAward(req, res);
@@ -186,7 +186,7 @@ module.exports = function (req, res, next) {
     var match = req.messageRaw.match(/\+\+|--|\u2013|\u2014/);
 
     if (match) {
-        PlusPlus.parseAwardCommand(req, res);
+        PlusPlus.parseAwardCommand(req, res, next);
     } else {
         return next();
     }
