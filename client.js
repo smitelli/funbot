@@ -48,7 +48,7 @@ bot.onInvite(function (room, inviter) {
 });
 
 config.loadPlugins.forEach(function (pluginFile) {
-    this.loadPlugin(pluginFile, require(pluginFile));
+    this.middleware.register(require(pluginFile));
 }, bot);
 
 armWatchdog();

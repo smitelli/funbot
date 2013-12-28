@@ -1,9 +1,11 @@
 'use strict';
 
-var onMessage = function (channel, from, message, matches) {
-    this.message(channel, matches[1]);
-};
+module.exports = function (req, res, next) {
+    var match = req.message.match(/^echo\s+(.+)$/i);
 
-module.exports.load = function (bot) {
-    bot.onMessage(/^echo\s+(.+)/i, onMessage);
+    if (match) {
+        res.respond(match[1]);
+    } else {
+        return next();
+    }
 };

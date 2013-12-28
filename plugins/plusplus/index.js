@@ -8,23 +8,16 @@ var format   = require('util').format,
 
 PlusPlus.THROTTLE_LIMIT = 10;  //cooldown delay before awarding again (seconds)
 
-PlusPlus.load = function(bot) {
-    // Handle instances of '++' and '--'. Also grab any en- and em-dashes.
-    bot.onMessage(/\+\+|--|\u2013|\u2014/, PlusPlus.parseAwardCommand);
-};
-
-PlusPlus.parseAwardCommand = function (channel, from, message) {
+PlusPlus.parseAwardCommand = function (req, res) {
     // Consider en- and em-dashes as possible '--' awards
-    message = message.replace(/\u2013|\u2014/g, '--');
+    var message = req.messageRaw.replace(/\u2013|\u2014/g, '--');
 
     // Pad the message with a leading and trailing space. (Makes the regexes a
     // hell of a lot simpler and more robust.)
     message = format(' %s ', message);
 
     var plusMatch  = message.match(/\s\+\+\s*@?(\w+)|@?(\w+)\s*\+\+\s/),
-        minusMatch = message.match(/\s--\s*@?(\w+)|@?(\w+)\s*--\s/),
-        toName,
-        award;
+        minusMatch = message.match(/\s--\s*@?(\w+)|@?(\w+)\s*--\s/);
 
     if (plusMatch && minusMatch) {
         // Both a '++'' and a '--'; ignore the whole thing
@@ -32,52 +25,37 @@ PlusPlus.parseAwardCommand = function (channel, from, message) {
 
     } else if (plusMatch) {
         // user++ or ++user
-        toName = plusMatch[1] || plusMatch[2];
-        award  = 1;
+        req.toName = plusMatch[1] || plusMatch[2];
+        req.award  = 1;
 
     } else if (minusMatch) {
         // user-- or --user
-        toName = minusMatch[1] || minusMatch[2];
-        award  = -1;
+        req.toName = minusMatch[1] || minusMatch[2];
+        req.award  = -1;
 
     } else {
         // No '++' and no '--'; don't continue
         return;
     }
 
-    PlusPlus.processAward(this, channel, from, toName, award);
+    PlusPlus.processAward(req, res);
 };
 
-PlusPlus.processAward = function (bot, channel, from, to, award) {
-    var fromUser,
-        toUser;
+PlusPlus.processAward = function (req, res) {
+    var db = req.bot.db;
 
     async.waterfall([
         function (cb) {
-            // In this case, 'from' is stored in the DB's 'name' column
-            bot.users.getByName(from, cb);
-        },
-
-        function (result, cb) {
-            var err;
-
-            if (!result) {
-                err = PlusPlus.getErr("Sorry %s, but I don't recognize your name!", from);
-                return cb(err, null);
-            }
-
-            fromUser = result;
-
             // Make sure the user giving the points exists in the data table
-            bot.db.run('INSERT OR IGNORE INTO `plusplus_data` (`users_id`) VALUES(?)', fromUser.id, cb);
+            db.run('INSERT OR IGNORE INTO `plusplus_data` (`users_id`) VALUES(?)', req.fromUser.id, cb);
         },
 
         function (cb) {
-            bot.db.all(
+            db.all(
                 'SELECT * FROM `plusplus_data` WHERE `users_id` = $id ' +
                 'AND `last_award` > strftime("%s", "now") - $lim',
                 {
-                    $id  : fromUser.id,
+                    $id  : req.fromUser.id,
                     $lim : PlusPlus.THROTTLE_LIMIT
                 },
                 cb
@@ -88,9 +66,9 @@ PlusPlus.processAward = function (bot, channel, from, to, award) {
             var err;
 
             if (throttleResult.length) {
-                err = PlusPlus.getErr(PlusPlus.getThrottleMessage(throttleResult[0].award_tries));
+                err = PlusPlus.makeErr(PlusPlus.getThrottleMessage(throttleResult[0].award_tries));
 
-                bot.db.run(
+                db.run(
                     'UPDATE `plusplus_data` SET `award_tries` = `award_tries` + 1 ' +
                     'WHERE `users_id` = ?', throttleResult[0].users_id
                 );
@@ -98,64 +76,64 @@ PlusPlus.processAward = function (bot, channel, from, to, award) {
                 return cb(err, null);
             }
 
-            bot.db.run(
+            db.run(
                 'UPDATE `plusplus_data` SET `award_tries` = 0, last_award = strftime("%s", "now") ' +
-                'WHERE `users_id` = ?', fromUser.id,
+                'WHERE `users_id` = ?', req.fromUser.id,
                 cb
             );
         },
 
         function (cb) {
-            bot.users.getByFuzzyName(to, cb);
+            req.bot.users.getByFuzzyName(req.toName, cb);
         },
 
         function (result, cb) {
-            var action = (award > 0 ? 'award yourself' : 'decrement your own'),
+            var action = (req.award > 0 ? 'award yourself' : 'decrement your own'),
                 err;
 
             // We don't need to check for result.length === 0, since
             // getByFuzzyName() will call the errback in that case.
-            toUser = result;
+            req.toUser = result;
 
-            if (fromUser.id === toUser.id) {
-                err = PlusPlus.getErr("Sorry @%s, you can't %s points.", fromUser.mention_name, action);
+            if (req.fromUser.id === req.toUser.id) {
+                err = PlusPlus.makeErr("Sorry @%s, you can't %s points.", req.fromUser.mention_name, action);
                 return cb(err, null);
             }
 
             // Make sure the user receiving the points exists in the data table
-            bot.db.run('INSERT OR IGNORE INTO `plusplus_data` (`users_id`) VALUES(?)', toUser.id, cb);
+            db.run('INSERT OR IGNORE INTO `plusplus_data` (`users_id`) VALUES(?)', req.toUser.id, cb);
         },
 
         function (cb) {
-            bot.db.run(
+            db.run(
                 'UPDATE `plusplus_data` SET `score` = `score` + $award WHERE `users_id` = $users_id',
                 {
-                    $award    : award,
-                    $users_id : toUser.id
+                    $award    : req.award,
+                    $users_id : req.toUser.id
                 },
                 cb
             );
         },
 
         function (cb) {
-            bot.db.get('SELECT * FROM `plusplus_data` WHERE `users_id` = ?', toUser.id, cb);
+            db.get('SELECT * FROM `plusplus_data` WHERE `users_id` = ?', req.toUser.id, cb);
         }
     ], function (err, result) {
         var response;
 
         if (err) {
             response = err.message;
-        } else if (award > 0) {
-            response = PlusPlus.getBumpMessage(toUser.mention_name, result.score);
+        } else if (req.award > 0) {
+            response = PlusPlus.getBumpMessage(req.toUser.mention_name, result.score);
         } else {
-            response = PlusPlus.getDissMessage(toUser.mention_name, result.score);
+            response = PlusPlus.getDissMessage(req.toUser.mention_name, result.score);
         }
 
-        bot.message(channel, response);
+        res.respond(response);
     });
 };
 
-PlusPlus.getErr = function () {
+PlusPlus.makeErr = function () {
     var message = format.apply(null, arguments);
 
     return new Error(message);
@@ -204,4 +182,12 @@ PlusPlus.getDissMessage = function (toMentionName, score) {
     return format(messages[Math.floor(Math.random() * messages.length)], toMentionName, score);
 };
 
-module.exports = PlusPlus;
+module.exports = function (req, res, next) {
+    var match = req.messageRaw.match(/\+\+|--|\u2013|\u2014/);
+
+    if (match) {
+        PlusPlus.parseAwardCommand(req, res);
+    } else {
+        return next();
+    }
+};
