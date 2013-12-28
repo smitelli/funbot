@@ -6,7 +6,7 @@ var format   = require('util').format,
     async    = require('async'),
     PlusPlus = {};
 
-PlusPlus.THROTTLE_LIMIT = 10;  //seconds
+PlusPlus.THROTTLE_LIMIT = 10;  //cooldown delay before awarding again (seconds)
 
 PlusPlus.load = function(bot) {
     // Handle instances of '++' and '--'. Also grab any en- and em-dashes.
@@ -23,8 +23,7 @@ PlusPlus.parseAwardCommand = function (channel, from, message) {
 
     var plusMatch  = message.match(/\s\+\+\s*@?(\w+)|@?(\w+)\s*\+\+\s/),
         minusMatch = message.match(/\s--\s*@?(\w+)|@?(\w+)\s*--\s/),
-        bot        = this,
-        toUserName,
+        toName,
         award;
 
     if (plusMatch && minusMatch) {
@@ -33,20 +32,20 @@ PlusPlus.parseAwardCommand = function (channel, from, message) {
 
     } else if (plusMatch) {
         // user++ or ++user
-        toUserName = plusMatch[1] || plusMatch[2];
-        award = 1;
+        toName = plusMatch[1] || plusMatch[2];
+        award  = 1;
 
     } else if (minusMatch) {
         // user-- or --user
-        toUserName = minusMatch[1] || minusMatch[2];
-        award = -1;
+        toName = minusMatch[1] || minusMatch[2];
+        award  = -1;
 
     } else {
         // No '++' and no '--'; don't continue
         return;
     }
 
-    PlusPlus.processAward(bot, channel, from, toUserName, award);
+    PlusPlus.processAward(this, channel, from, toName, award);
 };
 
 PlusPlus.processAward = function (bot, channel, from, to, award) {
@@ -75,11 +74,11 @@ PlusPlus.processAward = function (bot, channel, from, to, award) {
 
         function (cb) {
             bot.db.all(
-                'SELECT * FROM `plusplus_data` WHERE `users_id` = $id AND ' +
-                '`last_award` > strftime("%s", "now") - $throt',
+                'SELECT * FROM `plusplus_data` WHERE `users_id` = $id ' +
+                'AND `last_award` > strftime("%s", "now") - $lim',
                 {
-                    $id    : fromUser.id,
-                    $throt : PlusPlus.THROTTLE_LIMIT
+                    $id  : fromUser.id,
+                    $lim : PlusPlus.THROTTLE_LIMIT
                 },
                 cb
             );

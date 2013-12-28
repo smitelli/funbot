@@ -4,6 +4,7 @@ var format  = require('util').format,
     config  = require('config'),
     sqlite3 = require('sqlite3'),
     wobot   = require('wobot'),
+    Midware = require('./lib/middleware'),
     Rooms   = require('./lib/rooms'),
     Users   = require('./lib/users'),
     bot     = new wobot.Bot(config.botParams),
@@ -17,9 +18,10 @@ function armWatchdog () {
     }, config.watchdogTimeout);
 }
 
-bot.db    = new sqlite3.Database('./db/development.sqlite'),
-bot.rooms = new Rooms(bot),
-bot.users = new Users(bot);
+bot.db         = new sqlite3.Database('./db/development.sqlite');
+bot.middleware = new Midware(bot);
+bot.rooms      = new Rooms(bot);
+bot.users      = new Users(bot);
 
 bot.onConnect(function () {
     this.on('data', armWatchdog);
