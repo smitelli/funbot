@@ -1,6 +1,7 @@
 'use strict';
 
 var format  = require('util').format,
+    path    = require('path'),
     config  = require('config'),
     sqlite3 = require('sqlite3'),
     wobot   = require('wobot'),
@@ -47,8 +48,10 @@ bot.onInvite(function (room, inviter) {
     });
 });
 
-config.loadPlugins.forEach(function (pluginFile) {
-    this.middleware.register(require(pluginFile));
+config.loadMiddleware.forEach(function (pluginName) {
+    var pluginPath = path.join(__dirname, 'plugins', pluginName);
+
+    this.middleware.register(require(pluginPath));
 }, bot);
 
 armWatchdog();
