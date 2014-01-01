@@ -15,7 +15,7 @@ PlusPlus.THROTTLE_LIMIT = 10;
  * Analyzes the request message to determine if it contains an award command. If
  * it does, figure out who's getting the award and if it increases or decreases
  * that user's score. This is the last method where the bot can choose to
- * gracefully ignore the request.
+ * silently ignore the request.
  * @param {Object} req - The request object
  * @param {Object} res - The response object
  * @param {Function} next - The next plugin in the chain; will be called if this
@@ -53,6 +53,30 @@ PlusPlus.parseAwardCommand = function (req, res, next) {
 
     // The command has been parsed, now process it
     PlusPlus.processAward(req, res);
+};
+
+/**
+ * TODO
+ * @param {Object} req - The request object
+ * @param {Object} res - The response object
+ */
+PlusPlus.parseMetaCommand = function (req, res) {
+    var commandParts = req.metaCommand.split(/\s+/);
+
+    if (commandParts[0] === 'scores') {
+        res.respond('SCORES!');
+        return;
+
+    } else if (commandParts[0] === 'score') {
+        res.respond('SCOREeee! ' + commandParts[1]);
+        return;
+
+    } else {
+        res.respond(
+            format("@%s Sorry, I don't understand the command '%s'", req.fromUser.mention_name, commandParts[0])
+        );
+        return;
+    }
 };
 
 /**
@@ -265,7 +289,7 @@ PlusPlus.getDissMessage = function (toMentionName, score) {
 };
 
 /**
- * This plugin will check every message for a "++" or "--" award. If one is
+ * This plugin will check every message for a "++" or "--" award. If either is
  * found, the parser will handle the processing.
  * @param {Object} req - The request object
  * @param {Object} res - The response object
@@ -274,13 +298,23 @@ PlusPlus.getDissMessage = function (toMentionName, score) {
  */
 module.exports = function (req, res, next) {
     // Award symbols are "++" and "--". We accept en-dash/em-dash as "--" too.
-    var match = req.messageRaw.match(/\+\+|--|\u2013|\u2014/);
+    var awardMatch   = req.messageRaw.match(/\+\+|--|\u2013|\u2014/),
+        commandMatch = req.toOwnUser && req.message.match(/^plusplus\s+(.*?)$/i);
 
-    // If the message doesn't contain award symbols, there's no point continuing
-    if (!match) {
-        return next();
+    // If the message contains award commands, parse them
+    if (awardMatch) {
+        PlusPlus.parseAwardCommand(req, res, next);
+        return;
     }
 
-    // Parse the command
-    PlusPlus.parseAwardCommand(req, res, next);
+    // If the message is directed at the bot, it could be a command
+    if (commandMatch) {
+        req.metaCommand = commandMatch[1];
+
+        PlusPlus.parseMetaCommand(req, res);
+        return;
+    }
+
+    // Nothing to do; pass off to the next handler
+    return next();
 };
