@@ -403,6 +403,7 @@ PlusPlus.getDissMessage = function (toMentionName, score) {
  */
 module.exports = function (req, res, next) {
     // Award symbols are "++" and "--". We accept en-dash/em-dash as "--" too.
+    // Meta commands are directed at the bot and start with 'plusplus'.
     var awardMatch   = req.messageRaw.match(/\+\+|--|\u2013|\u2014/),
         commandMatch = req.toOwnUser && req.message.match(/^plusplus\s*(.*?)$/i);
 
@@ -412,7 +413,7 @@ module.exports = function (req, res, next) {
         return;
     }
 
-    // If the message is directed at the bot, it could be a command
+    // If the message is directed at the bot, it could be a meta command
     if (commandMatch) {
         req.metaCommand = commandMatch[1];
 
