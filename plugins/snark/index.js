@@ -38,6 +38,6 @@ module.exports = function (req, res, next) {
         return next();
     }
 
-    // Echo the request text into the response
+    // Spew some snark!
     res.respond(getSnarkMessage(req.fromUser.mention_name));
 };
