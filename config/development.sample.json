@@ -1,0 +1,13 @@
+{
+    "botParams": {
+        "jid": "jid@chat.domain.com/bot",
+        "password": "secret",
+        "debug": true
+    },
+    "bearerToken": "FILL ME IN",
+    "loadMiddleware": [
+        "echo",
+        "plusplus"
+    ],
+    "watchdogTimeout": 90000
+}
