@@ -56,7 +56,8 @@ PlusPlus.parseAwardCommand = function (req, res, next) {
 };
 
 /**
- * TODO
+ * Handles any commands directed at the bot starting with "plusplus" as the
+ * first word.
  * @param {Object} req - The request object
  * @param {Object} res - The response object
  */
@@ -64,16 +65,26 @@ PlusPlus.parseMetaCommand = function (req, res) {
     var commandParts = req.metaCommand.split(/\s+/);
 
     if (commandParts[0] === 'scores') {
-        res.respond('SCORES!');
+        // User wants the list of all scores
+        PlusPlus.processScoreListQuery(req, res);
         return;
 
     } else if (commandParts[0] === 'score') {
-        res.respond('SCOREeee! ' + commandParts[1]);
+        // User wants the scores for a particular user; read the next word
+        req.queryName = commandParts[1];
+
+        PlusPlus.processScoreUserQuery(req, res);
+        return;
+
+    } else if (commandParts[0] === '') {
+        // The command is missing
+        res.respond("Sorry, I didn't catch that.");
         return;
 
     } else {
+        // The command is not a valid keyword
         res.respond(
-            format("@%s Sorry, I don't understand the command '%s'", req.fromUser.mention_name, commandParts[0])
+            format("@%s Sorry, I don't understand the command '%s'.", req.fromUser.mention_name, commandParts[0])
         );
         return;
     }
@@ -161,7 +172,7 @@ PlusPlus.processAward = function (req, res) {
          * @param {Object} result - The award recipient's user row
          */
         function (result, cb) {
-            var action = (req.award > 0 ? 'award yourself' : 'decrement your own'),
+            var action = (req.award > 0) ? 'award yourself' : 'decrement your own',
                 err;
 
             // We don't need to check for result.length === 0, since
@@ -200,7 +211,7 @@ PlusPlus.processAward = function (req, res) {
             db.get('SELECT * FROM `plusplus_data` WHERE `users_id` = ?', req.toUser.id, cb);
         }
     ], function (err, result) {
-        var fn = (req.award > 0 ? 'getBumpMessage' : 'getDissMessage'),
+        var fn = (req.award > 0) ? 'getBumpMessage' : 'getDissMessage',
             response;
 
         if (err) {
@@ -211,6 +222,100 @@ PlusPlus.processAward = function (req, res) {
 
         res.respond(response);
     });
+};
+
+/**
+ * Process a command to list the current scores of all known users.
+ * @param {Object} req - The request object
+ * @param {Object} res - The response object
+ */
+PlusPlus.processScoreListQuery = function (req, res) {
+    // Query for the names and scores of all users in the data table
+    req.bot.db.all(
+        'SELECT * FROM `plusplus_data` ' +
+        'LEFT JOIN `users` ON `plusplus_data`.`users_id` = `users`.`id` ' +
+        'WHERE `users`.`id` IS NOT NULL',
+        function (err, results) {
+            var response;
+
+            if (err) {
+                // Some sort of unhandled error
+                response = "Sorry, something is wrong at the moment.";
+            } else if (!results.length) {
+                // Query ran okay, but zero results were returned
+                response = "Sorry, I don't have any scores to report.";
+            } else {
+                // Got results; build the score table
+                response = results.map(function (row) {
+                    var points = (row.score === 1) ? 'point' : 'points';
+                    return format('@%s (%s) ..... %d %s', row.mention_name, row.name, row.score, points);
+                }).join('\n');
+            }
+
+            res.respond(response);
+        }
+    );
+};
+
+/**
+ * Process a command to list the current scores of one specific user.
+ * @param {Object} req - The request object
+ * @param {Object} res - The response object
+ */
+PlusPlus.processScoreUserQuery = function (req, res) {
+    async.waterfall([
+        /**
+         * Ensure we were actually given a user name.
+         */
+        function (cb) {
+            var err = new Error(
+                "Sorry, you have to ask about a specific user. " +
+                "For example: plusplus score @<nick>"
+            );
+
+            if (!req.queryName) {
+                return cb(err, null);
+            }
+
+            cb();
+        },
+
+        /**
+         * Try to figure out which user row the supplied name refers to.
+         */
+        function (cb) {
+            req.bot.users.getByFuzzyName(req.queryName, cb);
+        },
+
+        /**
+         * Fetch the user's score data from the table.
+         */
+        function (userRow, cb) {
+            req.bot.db.get(
+                'SELECT * FROM `users` LEFT JOIN `plusplus_data` ' +
+                'ON `users`.`id` = `plusplus_data`.`users_id` ' +
+                'WHERE `users`.`id` = ?', userRow.id,
+                cb
+            );
+        }
+    ], function (err, result) {
+        var response;
+
+        if (err) {
+            // Some sort of unhandled error
+            response = err.message;
+        } else if (result.score === null) {
+            // User doesn't have any points registered
+            response = format("Sorry, but @%s hasn't received any points yet.", result.mention_name);
+        } else {
+            // Found the user; report their score
+            var points = (result.score === 1) ? 'point' : 'points';
+            response = format('@%s (%s) ..... %d %s', result.mention_name, result.name, result.score, points);
+        }
+
+        res.respond(response);
+    });
+    res.queryUser;
 };
 
 /**
@@ -251,15 +356,15 @@ PlusPlus.getThrottleMessage = function (tries) {
 PlusPlus.getBumpMessage = function (toMentionName, score) {
     var messages = [
         "w00t! @%s now at %d!",
-        "nice! @%s now at %d!",
-        "suh-weet! @%s now at %d!",
-        "well played! @%s now at %d!",
-        "zing! @%s now at %d!",
-        "you go girl! @%s now at %d!",
-        "booyakasha! @%s now at %d!",
-        "heyoooo! @%s now at %d!",
-        "sweet! @%s now at %d!",
-        "fist bump! @%s now at %d!"
+        "Nice! @%s now at %d!",
+        "Suh-weet! @%s now at %d!",
+        "Well played! @%s now at %d!",
+        "Zing! @%s now at %d!",
+        "You go girl! @%s now at %d!",
+        "Booyakasha! @%s now at %d!",
+        "Heyoooo! @%s now at %d!",
+        "Sweet! @%s now at %d!",
+        "Fist bump! @%s now at %d!"
     ];
 
     return format(messages[Math.floor(Math.random() * messages.length)], toMentionName, score);
@@ -274,15 +379,15 @@ PlusPlus.getBumpMessage = function (toMentionName, score) {
  */
 PlusPlus.getDissMessage = function (toMentionName, score) {
     var messages = [
-        "ouch! @%s now at %d!",
-        "daaaang! @%s now at %d!",
-        "denied! @%s now at %d!",
-        "ooooh! @%s now at %d!",
-        "owie! @%s now at %d!",
-        "awwww snap! @%s now at %d!",
-        "ya dun goofed! @%s now at %d!",
-        "boom! @%s now at %d!",
-        "oh no you did not! @%s now at %d!"
+        "Ouch! @%s now at %d!",
+        "Daaaang! @%s now at %d!",
+        "Denied! @%s now at %d!",
+        "Ooooh! @%s now at %d!",
+        "Owie! @%s now at %d!",
+        "Awwww snap! @%s now at %d!",
+        "Ya dun goofed! @%s now at %d!",
+        "Boom! @%s now at %d!",
+        "Oh no you did not! @%s now at %d!"
     ];
 
     return format(messages[Math.floor(Math.random() * messages.length)], toMentionName, score);
@@ -299,7 +404,7 @@ PlusPlus.getDissMessage = function (toMentionName, score) {
 module.exports = function (req, res, next) {
     // Award symbols are "++" and "--". We accept en-dash/em-dash as "--" too.
     var awardMatch   = req.messageRaw.match(/\+\+|--|\u2013|\u2014/),
-        commandMatch = req.toOwnUser && req.message.match(/^plusplus\s+(.*?)$/i);
+        commandMatch = req.toOwnUser && req.message.match(/^plusplus\s*(.*?)$/i);
 
     // If the message contains award commands, parse them
     if (awardMatch) {
