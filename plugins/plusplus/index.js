@@ -334,7 +334,7 @@ PlusPlus.makeErr = function () {
  * Rotates through the message list sequentially based on how many `tries` have
  * been attempted so far.
  * @param {Number} tries - How many attempts have been made while throttled
- * @return {String} A response message
+ * @return {String} The next response message
  */
 PlusPlus.getThrottleMessage = function (tries) {
     var messages = [
@@ -352,6 +352,7 @@ PlusPlus.getThrottleMessage = function (tries) {
  * from the arguments.
  * @param {String} toMentionName - The mentionName of the user being awarded
  * @param {Number} score - The new score
+ * @return {String} A random, filled-in response message
  */
 PlusPlus.getBumpMessage = function (toMentionName, score) {
     var messages = [
@@ -376,6 +377,7 @@ PlusPlus.getBumpMessage = function (toMentionName, score) {
  * from the arguments.
  * @param {String} toMentionName - The mentionName of the user being awarded
  * @param {Number} score - The new score
+ * @return {String} A random, filled-in response message
  */
 PlusPlus.getDissMessage = function (toMentionName, score) {
     var messages = [
