@@ -138,17 +138,16 @@ PlusPlus.processAward = function (req, res) {
          */
         function (throttleResult, cb) {
             var messages = [
-                    "@%s Sorry, you're trying to award too fast.",
-                    "@%s Seriously, slow your roll.",
-                    "@%s Now you're just embarassing yourself."
+                    "Sorry, you're trying to award too fast.",
+                    "Seriously, slow your roll.",
+                    "Now you're just embarassing yourself."
                 ],
                 err;
 
             if (throttleResult.length > 0) {
                 // User is awarding too fast; bail out
                 err = PlusPlus.makeErr(
-                    messages[throttleResult[0].award_tries % messages.length],
-                    req.fromUser.mention_name
+                    messages[throttleResult[0].award_tries % messages.length]
                 );
 
                 db.run(
@@ -191,7 +190,7 @@ PlusPlus.processAward = function (req, res) {
 
             // Don't allow a user to direct an award to themselves
             if (req.fromUser.id === req.toUser.id) {
-                err = PlusPlus.makeErr("@%s Sorry, you can't %s points.", req.fromUser.mention_name, action);
+                err = PlusPlus.makeErr("Sorry, you can't %s points.", action);
                 return cb(err, null);
             }
 
@@ -225,7 +224,7 @@ PlusPlus.processAward = function (req, res) {
             response;
 
         if (err) {
-            response = err.message;
+            response = format("@%s %s", req.fromUser.mention_name, err.message);
         } else {
             response = PlusPlus[fn](req.toUser.mention_name, result.score);
         }
@@ -279,9 +278,8 @@ PlusPlus.processScoreUserQuery = function (req, res) {
          */
         function (cb) {
             var err = PlusPlus.makeErr(
-                "@%s Sorry, you have to ask about a specific user. " +
-                "For example: `plusplus score @<nick>`",
-                req.fromUser.mention_name
+                "Sorry, you have to ask about a specific user. " +
+                "For example: `plusplus score @<nick>`"
             );
 
             if (!req.queryName) {
@@ -314,10 +312,13 @@ PlusPlus.processScoreUserQuery = function (req, res) {
 
         if (err) {
             // Some sort of unhandled error
-            response = err.message;
+            response = format("@%s %s", req.fromUser.mention_name, err.message);
         } else if (result.score === null) {
             // User doesn't have any points registered
-            response = format("Sorry, but @%s hasn't received any points yet.", result.mention_name);
+            response = format(
+                "@%s Sorry, but @%s hasn't received any points yet.",
+                req.fromUser.mention_name, result.mention_name
+            );
         } else {
             // Found the user; report their score
             var points = (result.score === 1) ? 'point' : 'points';
