@@ -78,13 +78,15 @@ PlusPlus.parseMetaCommand = function (req, res) {
 
     } else if (commandParts[0] === '') {
         // The command is missing
-        res.respond("Sorry, I didn't catch that.");
+        res.respond(
+            format("@%s Sorry, I didn't catch that.", req.fromUser.mention_name)
+        );
         return;
 
     } else {
         // The command is not a valid keyword
         res.respond(
-            format("@%s Sorry, I don't understand the command '%s'.", req.fromUser.mention_name, commandParts[0])
+            format("@%s Sorry, I don't understand the command `%s`.", req.fromUser.mention_name, commandParts[0])
         );
         return;
     }
@@ -135,11 +137,19 @@ PlusPlus.processAward = function (req, res) {
          *        previous function.
          */
         function (throttleResult, cb) {
-            var err;
+            var messages = [
+                    "@%s Sorry, you're trying to award too fast.",
+                    "@%s Seriously, slow your roll.",
+                    "@%s Now you're just embarassing yourself."
+                ],
+                err;
 
             if (throttleResult.length > 0) {
                 // User is awarding too fast; bail out
-                err = PlusPlus.makeErr(PlusPlus.getThrottleMessage(throttleResult[0].award_tries));
+                err = PlusPlus.makeErr(
+                    messages[throttleResult[0].award_tries % messages.length],
+                    req.fromUser.mention_name
+                );
 
                 db.run(
                     'UPDATE `plusplus_data` SET `award_tries` = `award_tries` + 1 ' +
@@ -181,7 +191,7 @@ PlusPlus.processAward = function (req, res) {
 
             // Don't allow a user to direct an award to themselves
             if (req.fromUser.id === req.toUser.id) {
-                err = PlusPlus.makeErr("Sorry @%s, you can't %s points.", req.fromUser.mention_name, action);
+                err = PlusPlus.makeErr("@%s Sorry, you can't %s points.", req.fromUser.mention_name, action);
                 return cb(err, null);
             }
 
@@ -268,9 +278,10 @@ PlusPlus.processScoreUserQuery = function (req, res) {
          * Ensure we were actually given a user name.
          */
         function (cb) {
-            var err = new Error(
-                "Sorry, you have to ask about a specific user. " +
-                "For example: plusplus score @<nick>"
+            var err = PlusPlus.makeErr(
+                "@%s Sorry, you have to ask about a specific user. " +
+                "For example: `plusplus score @<nick>`",
+                req.fromUser.mention_name
             );
 
             if (!req.queryName) {
@@ -327,23 +338,6 @@ PlusPlus.makeErr = function () {
     var message = format.apply(null, arguments);
 
     return new Error(message);
-};
-
-/**
- * Gets a response message for cases when the requester is awarding too fast.
- * Rotates through the message list sequentially based on how many `tries` have
- * been attempted so far.
- * @param {Number} tries - How many attempts have been made while throttled
- * @return {String} The next response message
- */
-PlusPlus.getThrottleMessage = function (tries) {
-    var messages = [
-        "Sorry, you're trying to award too fast.",
-        "Seriously, slow your roll.",
-        "Now you're just embarassing yourself."
-    ];
-
-    return messages[tries % messages.length];
 };
 
 /**
