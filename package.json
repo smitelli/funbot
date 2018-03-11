@@ -1,9 +1,9 @@
 {
     "name": "funbot",
     "version": "0.0.1",
-    "homepage": "http://github.com/smitelli/funbot",
+    "homepage": "https://github.com/smitelli/funbot",
     "description": "A pretty fun HipChat bot, extensible via plugins.",
-    "author": "Scott Smitelli <scott@smitelli.com> (http://twitter.com/smitelli)",
+    "author": "Scott Smitelli <scott@smitelli.com> (https://twitter.com/smitelli)",
     "keywords": [
         "bot",
         "hipchat"
